@@ -1,8 +1,17 @@
+from urllib import robotparser
+
 import requests
 from bs4 import BeautifulSoup
 import re
 from collections import defaultdict
 # http://www.cs.duke.edu/courses/spring14/compsci290/assignments/lab02.html
+
+
+def robots_parser(url='http://en.wikipedia.org/robots.txt'):
+    rp = robotparser.RobotFileParser()
+    rp.set_url("http://www.musi-cal.com/robots.txt")
+    rp.read()
+    return rp
 
 
 def get_html(url):
@@ -31,21 +40,12 @@ def should_exclude_link(link):
         'wikipedia:', 'wikimedia:', 'Category:',
     ]
     attr_stopwords = ['lang', 'action', 'accesskey']
-    # TODO Most of those exist in robots.txt
-    href_stopwords = [
-        '/wiki/Category:', '/w/index.php', '/wiki/Wikipedia:Community_portal',
-        'https://donate.wikimedia.org', '/wiki/Main_Page', '/wiki/Help:',
-        '/wiki/Portal:', '/wiki/Wikipedia:', '//shop.wikimedia.org',
-        '//en.wikiquote.org', '//commons.wikimedia.org', '#',
-        '/wiki/Special:'
-    ]
+
+    if not robots.can_fetch("*", link):
+        return False
 
     for stopword in attr_stopwords:
         if stopword in link.attrs:
-            return True
-
-    for stopword in href_stopwords:
-        if link.attrs['href'].startswith(stopword):
             return True
 
     if title:
@@ -59,20 +59,23 @@ def should_exclude_link(link):
 def link_result():
     return (0, set())
 
-link_dict = defaultdict(link_result)
+if __name__ == '__main__':
+    robots = robots_parser()
 
-for link in links:
-    if should_exclude_link(link):
-        continue
-    else:
-        title = link.attrs['title']
-        href = link.attrs['href']
-        count, titles = link_dict[href]
-        titles.add(title)
-        link_dict[href] = (count+1, titles)
+    link_dict = defaultdict(link_result)
 
-page = {
-    'short_description': description,
-    'links': link_dict,
-    'url': url
-}
+    for link in links:
+        if should_exclude_link(link, robots):
+            continue
+        else:
+            title = link.attrs['title']
+            href = link.attrs['href']
+            count, titles = link_dict[href]
+            titles.add(title)
+            link_dict[href] = (count+1, titles)
+
+    page = {
+        'short_description': description,
+        'links': link_dict,
+        'url': url
+    }
